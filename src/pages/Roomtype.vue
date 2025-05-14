@@ -1,42 +1,32 @@
 <template>
-  <div class="p-4">
+  <div class="p-4 space-x-4">
     <h1 class="text-2xl font-bold mb-4">Room Types</h1>
 
-    <!-- Add Room Form -->
-    <form @submit.prevent="addRoom" class="mb-6 space-y-4 max-w-md">
-      <input
-        v-model="newRoom.roomId"
-        type="text"
-        placeholder="Room ID or Number"
-        class="w-full p-2 border border-gray-300 rounded"
-        required
-      />
-      <input
-        v-model="newRoom.roomType"
-        type="text"
-        placeholder="Room Type (e.g., Deluxe, Single)"
-        class="w-full p-2 border border-gray-300 rounded"
-        required
-      />
-      <input
-        v-model="newRoom.price"
-        type="number"
-        placeholder="Price"
-        class="w-full p-2 border border-gray-300 rounded"
-        required
-      />
-      <button
-        type="submit"
-        class="px-4 py-2 bg-blue-500 text-white rounded"
-      >
-        Add Room
-      </button>
-    </form>
+    <button @click="showAddModal" class="p-2 bg-blue-500 text-white rounded mb-4">
+      Add Room Type
+    </button>
 
-    <!-- Room List Table -->
+    <!-- Modal -->
+    <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+      <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-lg">
+        <h2 class="text-xl font-semibold mb-4">{{ editingId ? "Edit" : "Add" }} Room Type</h2>
+
+        <input v-model="newRoom.roomType" placeholder="Room Type" class="w-full p-2 border border-gray-300 rounded mb-2" />
+        <input v-model="newRoom.price" type="number" placeholder="Price" class="w-full p-2 border border-gray-300 rounded mb-4" />
+
+        <div class="flex justify-end">
+          <button @click="closeModal" class="px-4 py-2 bg-gray-300 rounded mr-2">Cancel</button>
+          <button @click="submitRoom" class="px-4 py-2 bg-blue-500 text-white rounded">
+            {{ editingId ? "Update" : "Save" }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
     <DataTableComponent
       :headers="headers"
-      :data="rooms"
+      :data="roomTypes"
       @delete="deleteRoom"
       @edit="editRoom"
     />
@@ -45,46 +35,106 @@
 
 <script>
 import DataTableComponent from "../components/DataTableComponent.vue";
-import { addRoomType, fetchRoomTypes, deleteRoomById } from "../data/RoomType";
+import {
+  addRoomType,
+  fetchRoomTypes,
+  fetchRoomTypeById,
+  updateRoomTypeById,
+  deleteRoomTypeById,
+} from "../data/RoomType";
+
+import { fetchRooms } from "../data/RoomList"; // ✅ Import room list
 
 export default {
   components: { DataTableComponent },
   data() {
     return {
+      headers: ["Room Type", "Price", "Number of Rooms"],
+      roomTypes: [],
+      showModal: false,
+      editingId: null,
       newRoom: {
-        roomId: "",
         roomType: "",
-        price: null,
-      },
-      rooms: [],
-      headers: ["Room ID", "Room Type", "Price"],
+        price: ""
+      }
     };
   },
   async created() {
     await this.loadRooms();
   },
   methods: {
-    async addRoom() {
-      const data = {
-        roomId: this.newRoom.roomId,
-        roomType: this.newRoom.roomType,
-        price: this.newRoom.price,
-      };
-      await addRoomType(data);
-      this.newRoom = { roomId: "", roomType: "", price: null };
-      await this.loadRooms();
-    },
     async loadRooms() {
-      this.rooms = await fetchRoomTypes();
+      const [roomTypes, rooms] = await Promise.all([fetchRoomTypes(), fetchRooms()]);
+
+      this.roomTypes = roomTypes.map((type) => {
+        const count = rooms.filter((room) => room.roomType === type.roomType).length;
+        return {
+          id: type.id,
+          values: [type.roomType, `$${type.price}`, count]
+        };
+      });
     },
+    showAddModal() {
+      this.resetForm();
+      this.showModal = true;
+    },
+    closeModal() {
+      this.showModal = false;
+      this.resetForm();
+    },
+    async submitRoom() {
+  const trimmedType = this.newRoom.roomType.trim().toLowerCase();
+
+  if (!trimmedType || !this.newRoom.price) {
+    alert("Please fill in both Room Type and Price.");
+    return;
+  }
+
+  const isDuplicate = this.roomTypes.some(rt =>
+    rt.values[0].toLowerCase() === trimmedType &&
+    (!this.editingId || rt.id !== this.editingId)
+  );
+
+  if (isDuplicate) {
+    alert("This room type already exists.");
+    return;
+  }
+
+  const data = {
+    roomType: this.newRoom.roomType.trim(),
+    price: parseFloat(this.newRoom.price)
+  };
+
+  if (this.editingId) {
+    await updateRoomTypeById(this.editingId, data);
+  } else {
+    await addRoomType(data);
+  }
+
+  this.closeModal();
+  await this.loadRooms();
+}
+,
     async deleteRoom(id) {
-      await deleteRoomById(id);
+      const confirmDelete = confirm("Do you want to delete this room type?");
+      if (!confirmDelete) return;
+
+      await deleteRoomTypeById(id);
       await this.loadRooms();
     },
-    editRoom(id) {
-      alert(`Edit room with ID: ${id}`);
-      // You can add logic to pre-fill the form with data for editing
+    async editRoom(id) {
+      const doc = await fetchRoomTypeById(id);
+      this.editingId = id;
+      this.newRoom = {
+        roomType: doc.roomType,
+        price: doc.price
+      };
+      this.showModal = true;
     },
-  },
+    resetForm() {
+      this.newRoom = { roomType: "", price: "" };
+      this.editingId = null;
+    }
+  }
 };
 </script>

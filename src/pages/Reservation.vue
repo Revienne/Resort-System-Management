@@ -160,9 +160,13 @@ export default {
       await this.loadReservations();
     },
     async deleteReservation(id) {
-      await deleteReservationById(id);
-      await this.loadReservations();
-    },
+  const confirmDelete = confirm("Do you want to delete this reservation?");
+  if (!confirmDelete) return;
+
+  await deleteReservationById(id);
+  await this.loadReservations();
+},
+
     async editReservation(id) {
       const doc = await fetchReservationById(id);
       this.editingId = id;
