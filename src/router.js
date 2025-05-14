@@ -6,6 +6,7 @@ import Roomtype from './pages/Roomtype.vue';
 import Reservation from './pages/Reservation.vue';
 import Login from './pages/Login.vue';
 import NotFound from './pages/NotFound.vue';
+import Staff from './pages/Staff.vue';
 
 // Define routes
 const routes = [
@@ -38,6 +39,12 @@ const routes = [
         path: "roomtype",
         name: "Roomtype",
         component: Roomtype,
+        meta: { requiresAuth: true },  // Protect this route
+      },
+      {
+        path: "staff",
+        name: "Staff",
+        component: Staff,
         meta: { requiresAuth: true },  // Protect this route
       },
       {
